@@ -1,0 +1,9 @@
+{{imperative summary, ≤ 72 chars incl. the ref}} (#{{ID}})
+
+{{What changed — 1-3 short lines}}
+{{Why — 1-2 short lines}}
+
+Co-Authored-By: Claude {{MODEL}} <noreply@anthropic.com>
+
+# Local item (no GitHub issue): drop " (#{{ID}})" from the subject; do not write local-<n> into the message.
+# Lines starting with # are comments for the author; remove them before committing.

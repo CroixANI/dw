@@ -1,0 +1,11 @@
+{
+  "description": "Node.js / TypeScript (npm, pnpm, yarn or bun; jest, vitest, mocha, node --test, karma)",
+  "detect": ["package.json"],
+  "test_globs": ["**/*.test.*", "**/*.spec.*", "**/__tests__/**", "test/**", "tests/**", "e2e/**"],
+  "test_command_pattern": "\\b(npm|pnpm|yarn|bun)\\s+(run\\s+)?test\\b|\\b(jest|vitest|mocha|ava|karma)\\b|\\bplaywright\\s+test\\b|\\bng\\s+test\\b|\\bnode\\b[^|;&]*\\s--test\\b",
+  "build_cmd": "<pm> run build (when package.json has a build script; else <pm> exec tsc --noEmit for TypeScript)",
+  "test_cmd": "<pm> test",
+  "test_filter_hint": "jest/vitest: <pm> test -- <file or -t name>; node --test: node --test <file>; mocha: <pm> exec mocha <file>",
+  "lint_cmd": "<pm> run lint (when the script exists)",
+  "format_cmd": "<pm> exec prettier --check <changed files> (when prettier is configured)"
+}

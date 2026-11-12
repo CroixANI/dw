@@ -1,0 +1,9 @@
+{
+  "_note": "USD per 1M tokens, LIST-PRICE ESTIMATES (a subscription is not billed per token). Edit to your contracted rates. cache_read/cache_write_* default to 0.1x / 1.25x / 2x of input when omitted. 'default' is used for unknown models. size_usd = initial expected [low, high] USD per complexity size (guesses; replaced by your own merged-item history after 3 items per size).",
+  "claude-opus-5-5": { "input": 5, "output": 25 },
+  "claude-sonnet-5-5": { "input": 3, "output": 15 },
+  "claude-haiku-5-5": { "input": 1, "output": 5 },
+  "claude-fable-5-1": { "input": 5, "output": 25 },
+  "size_usd": { "XS": [0, 3], "S": [2, 8], "M": [6, 20], "L": [15, 50], "XL": [40, 150] },
+  "default": { "input": 3, "output": 15 }
+}

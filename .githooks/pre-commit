@@ -1,0 +1,3 @@
+#!/bin/sh
+# dw plugin repo: run the unit tests once, before each commit (not on every edit).
+exec npm test --silent

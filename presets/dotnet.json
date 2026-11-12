@@ -1,0 +1,11 @@
+{
+  "description": ".NET (dotnet CLI; xUnit, NUnit or MSTest)",
+  "detect": ["*.sln", "*.slnx", "*.csproj", "*.fsproj"],
+  "test_globs": ["**/*.Tests/**", "**/*.UnitTests/**", "**/*.IntegrationTests/**", "**/*.Test/**", "**/*Tests.cs"],
+  "test_command_pattern": "\\bdotnet(\\.exe)?\\s+(test|vstest)\\b|vstest\\.console",
+  "build_cmd": "dotnet build <solution or project>",
+  "test_cmd": "dotnet test <test project>",
+  "test_filter_hint": "dotnet test <test project> --filter \"FullyQualifiedName~<Class>.<Method>\"",
+  "lint_cmd": "",
+  "format_cmd": "dotnet format <solution or project> --verify-no-changes --include <changed files>"
+}

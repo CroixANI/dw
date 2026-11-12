@@ -1,0 +1,12 @@
+{
+  "name": "dw",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Dev tooling for the dw Claude Code plugin (no runtime dependencies).",
+  "scripts": {
+    "test": "node --test hooks/test/hooks.test.js",
+    "validate": "claude plugin validate . --strict",
+    "setup": "git config core.hooksPath .githooks"
+  },
+  "license": "MIT"
+}

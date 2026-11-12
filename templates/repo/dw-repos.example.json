@@ -1,0 +1,15 @@
+{
+  "_comment": "Optional personal overrides, for repos where you do not want to commit .claude/dw.json. Copy to <research_root>/dw-repos.json. Keys are repo names (last segment of the origin URL). Fields are the same as .claude/dw.json (see dw.example.json); a repo's own .claude/dw.json wins over this file. test_globs and test_command_pattern only ADD to the fallback/preset rules.",
+  "my-api": {
+    "base_branch": "main",
+    "stacks": ["dotnet"],
+    "test_cmd": "dotnet test",
+    "test_filter_hint": "--filter \"FullyQualifiedName~<Class>.<Method>\""
+  },
+  "my-web": {
+    "base_branch": "develop",
+    "stacks": ["node"],
+    "copy_untracked": [".env.local"],
+    "single_command_shell": false
+  }
+}

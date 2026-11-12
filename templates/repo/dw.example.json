@@ -1,0 +1,15 @@
+{
+  "_comment": "Example .claude/dw.json (commit it in the repo; /dw:setup-repo writes it for you). Every field is optional: missing fields come from the detected presets (presets/*.json) and the generic fallback. test_globs and test_command_pattern can only ADD to those rules, never switch test protection off. base_branch defaults to origin/HEAD, gh_repo to the origin URL.",
+  "stacks": ["node"],
+  "base_branch": "main",
+  "gh_repo": "github.com/owner/repo",
+  "test_globs": ["e2e/**"],
+  "test_command_pattern": "\\bplaywright\\s+test\\b",
+  "build_cmd": "npm run build",
+  "test_cmd": "npm test --",
+  "test_filter_hint": "npx vitest run <file> -t \"<test name>\"",
+  "lint_cmd": "npx eslint <changed files>",
+  "format_cmd": "npx prettier --check <changed files>",
+  "copy_untracked": [".env.local"],
+  "single_command_shell": false
+}

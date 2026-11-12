@@ -1,0 +1,63 @@
+{
+  "name": "dw",
+  "displayName": "Dev Workflow",
+  "version": "0.1.0",
+  "description": "AI-native SDLC workflow for GitHub: issue (or local item) -> design grilling -> approved plan -> test-first -> implement -> simplify -> test -> fresh review -> gated commit, PR and issue writes. Small orchestrator context, heavy work in subagents, rules in hooks, stack-agnostic repo profiles.",
+  "author": {
+    "name": "Aleksandr Nichiporovich"
+  },
+  "license": "MIT",
+  "keywords": [
+    "sdlc",
+    "github",
+    "worktree",
+    "tdd",
+    "review",
+    "hooks",
+    "subagents"
+  ],
+  "userConfig": {
+    "research_root": {
+      "type": "directory",
+      "title": "Research root",
+      "description": "Folder for per-item working folders (<id>-<slug>). Keep it outside the main checkout (Claude Code blocks edits there from a worktree session). Empty = <parent of main checkout>/<repo family>-research, where family is the checkout folder name up to the first '.'.",
+      "default": ""
+    },
+    "protected_branches": {
+      "type": "string",
+      "title": "Protected branches",
+      "description": "Comma-separated branch globs where Edit/Write is blocked (git-ignored files excepted).",
+      "default": "main,master,develop,release/*"
+    },
+    "branch_template": {
+      "type": "string",
+      "title": "Branch template",
+      "description": "Item branch name. Placeholders: {prefix} (fix for a bug, else feature), {id} (issue number or local-<n>), {slug}.",
+      "default": "{prefix}/{id}-{slug}"
+    },
+    "worktree_root": {
+      "type": "directory",
+      "title": "Worktree root",
+      "description": "Folder for item worktrees. Empty = <parent of main checkout>/<repo>-worktrees.",
+      "default": ""
+    },
+    "type_labels": {
+      "type": "string",
+      "title": "Issue type labels",
+      "description": "Maps GitHub labels to dw item types: type=label|label;... Types: bug (investigate), feature (scope), epic (split), task (deliver). No match: dw asks.",
+      "default": "bug=bug;epic=epic;feature=enhancement|feature;task=task"
+    },
+    "github_mcp_servers": {
+      "type": "string",
+      "title": "GitHub MCP servers",
+      "description": "Comma-separated MCP server names gated as GitHub (exact name, or a plugin server ending in _<name>). A name other than github also needs adding to the hooks.json matcher.",
+      "default": "github"
+    },
+    "usage_auto_refresh": {
+      "type": "boolean",
+      "title": "Auto-refresh usage stats",
+      "description": "At session end (and /clear) refresh usage.md/usage.json of the item bound to the worktree and the usage dashboard. Reads local transcripts only; no tokens used.",
+      "default": true
+    }
+  }
+}

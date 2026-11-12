@@ -1,0 +1,18 @@
+{
+  "name": "dw",
+  "owner": {
+    "name": "Aleksandr Nichiporovich"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace for the dw (Dev Workflow) plugin."
+  },
+  "plugins": [
+    {
+      "name": "dw",
+      "source": ".",
+      "description": "AI-native SDLC workflow for GitHub: issue (or local item) -> design grilling -> approved plan -> test-first -> implement -> simplify -> test -> fresh review -> gated commit, PR and issue writes. Small orchestrator context, heavy work in subagents, rules in hooks, stack-agnostic repo profiles.",
+      "version": "0.1.0",
+      "category": "development"
+    }
+  ]
+}
