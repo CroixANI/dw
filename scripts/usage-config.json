@@ -1,0 +1,32 @@
+{
+  "_note": "dw usage settings. Override any top-level key in <research root>/usage-config.local.json (thresholds merge per rule, other keys are replaced as a whole). Regexes match the file path with forward slashes; a repo-relative path from a PR gets a leading '/'. $1, $2 = capture groups; an empty or missing group in 'module' falls back to the area.",
+  "active_gap_min": 15,
+  "context_heavy_tokens": 150000,
+  "areas": {
+    "rules": [
+      { "match": "^/?([^/]+)/(?:([^/]+)/)?", "area": "$1", "module": "$1/$2" }
+    ],
+    "ignore": "/\\.claude/|-research/",
+    "test_match": "\\.(spec|test)\\.[cm]?[jt]sx?$|/(__tests__|tests?|spec)/|[._]tests?\\.|_test\\.(go|py)$|/golden/|\\.golden\\."
+  },
+  "stages": {
+    "understand": ["dw:start", "dw:grill", "dw:investigate", "dw:scope", "dw:split", "dw:researcher", "Explore", "Plan", "dw:log-analyst", "dw:complexity-estimator"],
+    "implement": ["dw:implementer", "dw:simplifier", "dw:deliver"],
+    "test": ["dw:test-author", "dw:test-runner", "dw:unlock-tests"],
+    "review": ["dw:code-reviewer", "code-review", "simplify"],
+    "pr feedback": ["dw:pr-sweep"],
+    "ceremony": ["dw:worktree", "dw:commit", "dw:pr", "dw:resume", "dw:github-conventions", "dw:setup-repo", "dw:usage", "dw:status"]
+  },
+  "thresholds": {
+    "ceremony_share": { "max": 0.2, "format": "pct", "label": "High ceremony share" },
+    "conversation_share": { "max": 0.35, "format": "pct", "label": "High conversation share" },
+    "heavy_context_share": { "max": 0.5, "format": "pct", "label": "Heavy-context $ share" },
+    "peak_context_tokens": { "max": 180000, "format": "tokens", "label": "Peak context size" },
+    "test_to_impl_ratio": { "max": 2, "format": "x", "label": "Test vs implement cost" },
+    "explore_calls": { "max": 3, "label": "Explore / general-purpose calls" },
+    "over_estimate": { "max": 1.5, "format": "x", "label": "Over size estimate" },
+    "after_merge_share": { "max": 0.15, "format": "pct", "label": "Cost after merge" },
+    "user_prompts": { "max": 15, "label": "User prompts" },
+    "compactions": { "max": 1, "label": "Context compactions" }
+  }
+}

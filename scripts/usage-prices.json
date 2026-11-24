@@ -4,6 +4,8 @@
   "claude-sonnet-5-5": { "input": 3, "output": 15 },
   "claude-haiku-5-5": { "input": 1, "output": 5 },
   "claude-fable-5-1": { "input": 5, "output": 25 },
+  "claude-fable-5-2": { "input": 5, "output": 25 },
+  "<synthetic>": { "input": 0, "output": 0 },
   "size_usd": { "XS": [0, 3], "S": [2, 8], "M": [6, 20], "L": [15, 50], "XL": [40, 150] },
   "default": { "input": 3, "output": 15 }
 }

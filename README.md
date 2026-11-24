@@ -105,7 +105,7 @@ flowchart TD
 | `/dw:pr [--draft] [--stack]` | Push plus PR, or a `gh stack` of PRs (gate 3). |
 | `/dw:pr-sweep [n]` | One cycle over unresolved review threads and failing checks: fix, test once, push, reply. |
 | `/dw:setup-repo [path]` | Infers the repo profile and writes `.claude/dw.json` after approval. |
-| `/dw:usage [id]` | Tokens and estimated $ of the item (main session + subagents) into `usage.md`/`usage.json`, plus the `usage-dashboard.html` summary in the research root. Refreshed automatically at session end (option `usage_auto_refresh`). |
+| `/dw:usage [id]` | Tokens and estimated $ per item (main session + subagents) broken down by stages and areas (from changed files, filterable on the dashboard), with threshold signals, written to `<item>/usage.md` + `usage.json`, plus `<research_root>/usage-dashboard.html` and `usage-help.html`. Config lives in `scripts/usage-config.json` (overridable in `<research_root>/usage-config.local.json`), refreshes automatically at session end (`usage_auto_refresh`), and marks an item merged once its PR in `plan.md` is merged. |
 | `/dw:unlock-tests <reason>` | Removes the test lock of the current checkout (asks you first). The reason is logged in `plan.md`. |
 
 Knowledge skills that Claude loads by itself: `worktree`, `github-conventions`.
