@@ -958,7 +958,7 @@ test('dw-usage: item sums main + subagent usage by worktree id, dedupes streamin
   assert.strictEqual(j.total.output, 100 + 250 + 300 + 400);
   assert.strictEqual(j.by_phase['dw:code-reviewer'].calls, 1);
   assert.ok(fs.existsSync(path.join(root, '55555-demo-item', 'usage.md')));
-  execFileSync('node', [USAGE, 'report', '--root', root], { encoding: 'utf8' });
+  execFileSync('node', [USAGE, 'report', '--root', root, '--projects-dir', projects], { encoding: 'utf8' });
   assert.match(fs.readFileSync(path.join(root, 'usage-dashboard.html'), 'utf8'), /#55555/);
 });
 
@@ -1390,4 +1390,253 @@ test('real paths: short-name path to an ignored file, an item file and lock-test
   assert.deepStrictEqual(JSON.parse(r.stdout).locked, ['src/a.spec.ts']);
   // the item folder through its short name is still "inside the item folder" for the guard (plan.md stays editable there)
   assert.notStrictEqual(run('guard-edit.js', edit(wtr, short(path.join(item, 'plan.md')))).decision, 'deny');
+});
+
+// ---------- dw-usage v2: config, areas, stages, thresholds, claims, folder items, sticky attribution ----------
+test('dw-usage v2: areas and stages come from usage-config.json; thresholds fire and merge with usage-config.local.json', () => {
+  const usage = require(path.join(ROOT, 'scripts', 'dw-usage.js'));
+  const u = fs.mkdtempSync(path.join(tmp, 'usage-v2-cfg-'));
+  const cfg = usage.loadConfig(u);
+
+  // generic area rules from usage-config.json
+  assert.deepStrictEqual(usage.areaOf('src/auth/login.ts', cfg._areas), { area: 'src', module: 'src/auth', kind: 'prod' });
+  assert.deepStrictEqual(usage.areaOf('src/auth/login.spec.ts', cfg._areas), { area: 'src', module: 'src/auth', kind: 'test' });
+  assert.deepStrictEqual(usage.areaOf('src/index.ts', cfg._areas), { area: 'src', module: 'src', kind: 'prod' });
+  assert.deepStrictEqual(usage.areaOf('/repo/.claude/dw.json', cfg._areas), { ignored: true });
+  assert.strictEqual(usage.areaOf('README.md', cfg._areas), null);
+
+  // stage mapping
+  assert.strictEqual(cfg._stageOf('main'), 'conversation');
+  assert.strictEqual(cfg._stageOf('main:dw:commit'), 'ceremony');
+  assert.strictEqual(cfg._stageOf('dw:implementer'), 'implement');
+  assert.strictEqual(cfg._stageOf('dw:test-author'), 'test');
+  assert.strictEqual(cfg._stageOf('dw:code-reviewer'), 'review');
+  assert.strictEqual(cfg._stageOf('dw:pr-sweep'), 'pr feedback');
+  assert.strictEqual(cfg._stageOf('dw:researcher'), 'understand');
+  assert.strictEqual(cfg._stageOf('general-purpose'), 'other');
+
+  // activeMin: sums gaps <= gapMin and ignores longer breaks
+  assert.strictEqual(
+    usage.activeMin(['2026-11-04T10:00:00Z', '2026-11-04T10:05:00Z', '2026-11-04T10:45:00Z', '2026-11-04T10:55:00Z'], 15),
+    15
+  );
+
+  // thresholds fire on metrics
+  const item = {
+    total: { usd: 10 },
+    by_stage: { ceremony: { usd: 3 }, conversation: { usd: 4 } },
+    by_phase: { 'dw:implementer': { usd: 1, calls: 2 }, 'dw:test-author': { usd: 3, calls: 4 }, Explore: { usd: 0.5, calls: 4 } },
+    main: { heavy_usd: 6 },
+    context: { peak_tokens: 190000, compactions: { auto: 2, manual: 0 } },
+    prompts: 20,
+    final: true,
+    usd_after_merge: 2,
+  };
+  const m = usage.metricsOf(item, cfg, { low: 1, high: 5 });
+  const flags = usage.flagsOf(m, cfg);
+  for (const k of ['ceremony_share', 'conversation_share', 'heavy_context_share', 'peak_context_tokens', 'test_to_impl_ratio', 'explore_calls', 'over_estimate', 'after_merge_share', 'user_prompts', 'compactions']) {
+    assert.ok(flags.includes(k), 'expected threshold to fire: ' + k);
+  }
+
+  // local override merges thresholds per rule and replaces other top-level keys
+  fs.writeFileSync(
+    path.join(u, 'usage-config.local.json'),
+    JSON.stringify({ active_gap_min: 30, thresholds: { ceremony_share: { max: 0.5 }, user_prompts: { max: 25 } } })
+  );
+  const merged = usage.loadConfig(u);
+  assert.strictEqual(merged.active_gap_min, 30);
+  assert.strictEqual(merged.thresholds.ceremony_share.max, 0.5);
+  assert.strictEqual(merged.thresholds.ceremony_share.format, 'pct', 'rule metadata preserved on merge');
+  assert.strictEqual(merged.thresholds.compactions.max, 1, 'other rules preserved on merge');
+  const flagsAfter = usage.flagsOf(m, merged);
+  assert.ok(!flagsAfter.includes('ceremony_share'));
+  assert.ok(!flagsAfter.includes('user_prompts'));
+  assert.ok(flagsAfter.includes('compactions'));
+});
+
+test('dw-usage v2: edited files, prompts, <synthetic> $0, --session claims and folder items without an id reach usage.json, dashboard and usage-help.html', () => {
+  const u = fs.mkdtempSync(path.join(tmp, 'usage-v2-e2e-'));
+  const projects = path.join(u, 'projects');
+  const root = path.join(u, 'app-research');
+  const item42 = path.join(root, '42-login-fix');
+  const folderItem = path.join(root, 'adhoc-notes');
+  fs.mkdirSync(item42, { recursive: true });
+  fs.mkdirSync(folderItem, { recursive: true });
+  const projDir = path.join(projects, 'app');
+  fs.mkdirSync(projDir, { recursive: true });
+
+  const wt42 = '/repos/app-worktrees/42-login-fix';
+  const mainCwd = '/repos/app';
+  const asst = (id, cwd, extra = {}) =>
+    JSON.stringify({
+      type: 'assistant',
+      timestamp: extra.ts || '2026-11-04T10:00:00Z',
+      cwd,
+      gitBranch: extra.branch || 'main',
+      requestId: 'r' + id,
+      attributionSkill: extra.skill,
+      message: {
+        id: 'm' + id,
+        model: extra.model || 'claude-sonnet-5-5',
+        content: extra.content || [],
+        usage: { input_tokens: 100, output_tokens: extra.out || 1000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    });
+  const usr = (id, cwd, content, extra = {}) =>
+    JSON.stringify({
+      type: 'user',
+      uuid: 'u' + id,
+      timestamp: extra.ts || '2026-11-04T10:00:00Z',
+      cwd,
+      message: { role: 'user', content },
+      ...extra,
+    });
+
+  // Session s1: worktree 42 with streaming chunks editing two files, <synthetic> call, real prompts and noise prompts
+  fs.writeFileSync(
+    path.join(projDir, 's1.jsonl'),
+    [
+      usr(1, wt42, 'Fix login bug'),
+      usr(2, wt42, '<task-notification>subagent done</task-notification>'),
+      usr(3, wt42, 'meta prompt', { isMeta: true }),
+      usr(4, wt42, [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }]),
+      usr(5, wt42, [{ type: 'text', text: 'Also add a spec' }]),
+      asst(1, wt42, {
+        ts: '2026-11-04T10:01:00Z',
+        content: [{ type: 'tool_use', name: 'Edit', input: { file_path: 'src/auth/login.ts' } }],
+      }),
+      // streaming duplicate for m1/r1 adding a second edited file
+      asst(1, wt42, {
+        ts: '2026-11-04T10:01:05Z',
+        out: 1500,
+        content: [{ type: 'tool_use', name: 'Write', input: { file_path: 'src/auth/login.spec.ts' } }],
+      }),
+      asst(2, wt42, { ts: '2026-11-04T10:02:00Z', model: '<synthetic>', out: 500000 }),
+    ].join('\n')
+  );
+
+  // Session s-claim: main checkout (no id in cwd/branch), claimed for item 42 via --session
+  fs.writeFileSync(
+    path.join(projDir, 's-claim.jsonl'),
+    [usr(10, mainCwd, 'Discuss design'), asst(10, mainCwd, { ts: '2026-11-04T10:05:00Z', out: 2000 })].join('\n')
+  );
+
+  // Session s-folder: main checkout, claimed for folder item without an id
+  fs.writeFileSync(
+    path.join(projDir, 's-folder.jsonl'),
+    [usr(20, mainCwd, 'Investigate metrics'), asst(20, mainCwd, { ts: '2026-11-04T10:10:00Z', out: 3000 })].join('\n')
+  );
+
+  const USAGE = path.join(ROOT, 'scripts', 'dw-usage.js');
+  // Item 42 with explicit --session claim
+  const r42 = JSON.parse(
+    execFileSync('node', [USAGE, 'item', '--id', '42', '--root', root, '--projects-dir', projects, '--session', 's-claim'], { encoding: 'utf8' })
+  );
+  assert.ok(Array.isArray(r42.signals));
+  const j42 = JSON.parse(fs.readFileSync(path.join(item42, 'usage.json'), 'utf8'));
+  assert.strictEqual(j42.item_id, '42');
+  assert.strictEqual(j42.prompts, 3); // 2 real prompts in s1 + 1 in s-claim (noise ignored)
+  assert.strictEqual(j42.sessions, 2);
+  assert.deepStrictEqual(j42.scope, { sessions: ['s-claim'] });
+  assert.strictEqual(j42.by_model['<synthetic>'].usd, 0);
+  assert.deepStrictEqual(j42.unknown_models, []);
+  assert.ok(j42.edited_files.includes('src/auth/login.ts') && j42.edited_files.includes('src/auth/login.spec.ts'));
+  assert.deepStrictEqual(j42.areas, [
+    { area: 'src', module: 'src/auth', kind: 'prod', files: 1 },
+    { area: 'src', module: 'src/auth', kind: 'test', files: 1 },
+  ]);
+
+  // Folder item without --session fails before scope is stored
+  const failFolder = spawnSync('node', [USAGE, 'item', '--item-dir', folderItem, '--projects-dir', projects], { encoding: 'utf8' });
+  assert.notStrictEqual(failFolder.status, 0);
+  assert.match(failFolder.stderr, /--session/);
+
+  // Folder item with --session succeeds and remembers scope on subsequent refresh (including relative --item-dir .)
+  execFileSync('node', [USAGE, 'item', '--item-dir', '.', '--session', 's-folder', '--projects-dir', projects], { cwd: folderItem, encoding: 'utf8' });
+  const jf = JSON.parse(fs.readFileSync(path.join(folderItem, 'usage.json'), 'utf8'));
+  assert.strictEqual(jf.item_id, null);
+  assert.strictEqual(jf.status, 'folder');
+  assert.strictEqual(jf.label, 'adhoc-notes');
+  assert.strictEqual(jf.title, 'adhoc notes');
+  assert.deepStrictEqual(jf.scope, { sessions: ['s-folder'] });
+  execFileSync('node', [USAGE, 'item', '--item-dir', '.', '--projects-dir', projects], { cwd: folderItem, encoding: 'utf8' });
+
+  // Report builds both usage-dashboard.html and usage-help.html
+  const rep = JSON.parse(execFileSync('node', [USAGE, 'report', '--root', root, '--projects-dir', projects], { encoding: 'utf8' }));
+  assert.strictEqual(rep.items, 2);
+  assert.strictEqual(rep.coverage, 1);
+  const dash = fs.readFileSync(path.join(root, 'usage-dashboard.html'), 'utf8');
+  const help = fs.readFileSync(path.join(root, 'usage-help.html'), 'utf8');
+  assert.match(dash, /#42/);
+  assert.match(dash, /adhoc-notes/);
+  assert.match(dash, /usage-help\.html/);
+  assert.match(help, /How to read the usage stats/);
+  assert.match(help, /Item id but no usage\.json/);
+});
+
+test('dw-usage v2: sticky skill attribution keeps last main-session skill across untagged turns and tool results until next user prompt; subagents never inherit', () => {
+  const u = fs.mkdtempSync(path.join(tmp, 'usage-v2-sticky-'));
+  const projects = path.join(u, 'projects');
+  const root = path.join(u, 'app-research');
+  const itemDir = path.join(root, 'local-1-sticky');
+  fs.mkdirSync(itemDir, { recursive: true });
+  const projDir = path.join(projects, 'app');
+  const subDir = path.join(projDir, 'sess-sticky', 'subagents');
+  fs.mkdirSync(subDir, { recursive: true });
+
+  const wtDir = '/repos/app-worktrees/local-1-sticky';
+  const asst = (id, extra = {}) =>
+    JSON.stringify({
+      type: 'assistant',
+      timestamp: extra.ts || '2026-11-04T11:00:00Z',
+      cwd: wtDir,
+      requestId: 'r' + id,
+      ...(extra.skill ? { attributionSkill: extra.skill } : {}),
+      message: {
+        id: 'm' + id,
+        model: 'claude-sonnet-5-5',
+        usage: { input_tokens: 100, output_tokens: 1000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    });
+  const usr = (id, content, extra = {}) =>
+    JSON.stringify({
+      type: 'user',
+      uuid: 'u' + id,
+      timestamp: '2026-11-04T11:00:00Z',
+      cwd: wtDir,
+      message: { role: 'user', content },
+      ...extra,
+    });
+
+  fs.writeFileSync(
+    path.join(projDir, 'sess-sticky.jsonl'),
+    [
+      usr(1, '/dw:deliver local-1'),
+      asst(1, { skill: 'dw:deliver' }), // tagged -> main:dw:deliver (implement)
+      usr(2, [{ type: 'tool_result', tool_use_id: 't1', content: 'ok' }]), // tool result: must NOT reset sticky
+      usr(3, '<task-notification>agent done</task-notification>'), // task notification: must NOT reset sticky
+      asst(2), // untagged -> inherits dw:deliver (implement)
+      usr(4, 'Quick follow-up question'), // real user prompt -> resets sticky
+      asst(3), // untagged -> main (conversation)
+    ].join('\n')
+  );
+
+  // Subagent: tagged first call + untagged second call, neither should ever inherit sticky skill
+  fs.writeFileSync(
+    path.join(subDir, 'agent-1.jsonl'),
+    [asst(10, { skill: 'dw:deliver' }), asst(11)].join('\n')
+  );
+  fs.writeFileSync(path.join(subDir, 'agent-1.meta.json'), JSON.stringify({ agentType: 'dw:researcher' }));
+
+  const USAGE = path.join(ROOT, 'scripts', 'dw-usage.js');
+  execFileSync('node', [USAGE, 'item', '--id', 'local-1', '--root', root, '--projects-dir', projects], { encoding: 'utf8' });
+  const j = JSON.parse(fs.readFileSync(path.join(itemDir, 'usage.json'), 'utf8'));
+
+  assert.strictEqual(j.item_id, 'local-1');
+  assert.strictEqual(j.by_phase['main:dw:deliver'].calls, 2, 'tagged + untagged after tool result/notification');
+  assert.strictEqual(j.by_phase['main'].calls, 1, 'turn after real user prompt resets to conversation');
+  assert.strictEqual(j.by_phase['dw:researcher'].calls, 2, 'subagent calls stay under agent type');
+  assert.strictEqual(j.by_stage.implement.calls, 2);
+  assert.strictEqual(j.by_stage.conversation.calls, 1);
+  assert.strictEqual(j.by_stage.understand.calls, 2);
 });
