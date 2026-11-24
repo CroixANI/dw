@@ -1,5 +1,5 @@
 {
-  "description": "dw guardrails: edit guard (protected branches, worktree scope, plan gate, test lock), approval gates 1-4 (plan, commit, push/PR, GitHub issue writes), no tests during coding, locked-test integrity.",
+  "description": "dw guardrails: edit guard (protected branches, worktree scope, plan gate, test lock), approval gates 1-4, no tests during coding.",
   "hooks": {
     "SessionStart": [
       {
@@ -92,20 +92,6 @@
             "command": "node",
             "args": [
               "${CLAUDE_PLUGIN_ROOT}/hooks/plan-approved.js"
-            ],
-            "timeout": 15
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node",
-            "args": [
-              "${CLAUDE_PLUGIN_ROOT}/hooks/subagent-stop.js"
             ],
             "timeout": 15
           }

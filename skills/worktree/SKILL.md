@@ -51,7 +51,7 @@ Run in the main checkout, one git command per Bash call:
 5. No `EnterWorktree`: the cwd is already the checkout. Skip the `/rename` hint (SessionStart only titles linked worktrees).
 
 ## Multi-repo item (for example `api` + `web` in one session)
-One item can edit several repos from one session. Each checkout is still bound to at most one item. `/dw:deliver` does the steps below itself after plan approval when plan.md `repos:` lists more than one (pipeline §3a); do them by hand only for ad-hoc use.
+One item can edit several repos from one session. Each checkout is still bound to at most one item. `/dw:deliver` does the steps below itself after plan approval when plan.md `repos:` lists more than one (`/dw:deliver` `references/step-3a-multi-repo.md`); do them by hand only for ad-hoc use.
 1. Start the item in the first checkout as above (worktree or branch only; `S init`).
 2. Ask the isolation question for the second repo too, then create its item branch with the **same branch name** as the first (`git worktree add -b <branch> <path> origin/<that repo's base branch>`, or "Branch only"). Copy that repo's `copy_untracked` files (`S profile --repo "<its main checkout>"`).
 3. From the first checkout: `S bind-repo "<second checkout path>"`. It refuses protected branches and checkouts bound to another item, and is idempotent.

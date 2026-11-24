@@ -2,7 +2,7 @@
 name: code-reviewer
 description: Fresh-context, read-only reviewer for a dw item. Reviews the branch diff against plan.md, spec.md and the repo's REVIEW.md in three passes (Bugs, Security, Compliance) and returns findings ranked by severity. Use after tests pass, before the commit gate. It never fixes anything.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: opus
 color: pink
 maxTurns: 40
 ---

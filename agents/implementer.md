@@ -13,7 +13,7 @@ You are the **implementer**. You turn `plan.md` into code. Hooks enforce: no edi
 - `plan`: path to `plan.md` (+ `spec.md` for design decisions).
 - `worktree`: the only place you edit (one repo per call; with a multi-repo item you get the section of `plan.md` for that repo).
 - The repo profile from `dw-state.js repos` (`build_cmd`, `single_command_shell`, ...).
-- Optionally a **fix list** (from test-runner failures or code-reviewer Important findings) and locked test file names. Locked tests define correct behaviour: make them pass by changing production code.
+- Optionally a **fix list**: `failures_file` (a test-runner report in `<item>/runs/`; fix the `failures` of your repo only) or the code-reviewer `fix` ids, plus locked test file names. Locked tests define correct behaviour: make them pass by changing production code.
 
 ## How to work
 1. Read `plan.md` `## Files that change` and `## Order of work`. Follow the order. Read the repo `CLAUDE.md` and the matching `.claude/rules/` for each area you touch.

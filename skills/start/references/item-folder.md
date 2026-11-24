@@ -16,6 +16,7 @@ One artifact per stage, all lowercase file names, following the AI-Native SDLC c
 | `history.md` | every iteration | deliver / pr (append-only; one section per iteration) | deliver step 0, `/dw:resume`, `/dw:status` |
 | `plan-iter<N>.md` | iteration N closed | deliver (copy of the old plan when iteration N+1 starts) | humans, researcher |
 | `estimate.json` | after plan approval | deliver (complexity-estimator) | `/dw:usage` |
+| `runs/verify-<n>.md` | verify | test-runner | implementer, user |
 | `documents/` | investigate | downloaded attachments, extracted archives, `log-analysis.md` | investigate |
 
 Bugs, features and epics have a `spec.md` with only `## Source`; their findings live in `outcomes.md`. Decisions stay empty unless `/dw:grill` runs.

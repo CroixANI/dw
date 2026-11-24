@@ -119,8 +119,8 @@ Knowledge skills that Claude loads by itself: `worktree`, `github-conventions`.
 | test-author | sonnet | test files only | tests and their fail/pass reason |
 | implementer | inherit | production code only, no test runs | files changed, build, deviations |
 | simplifier | sonnet | only files already in the diff, no tests | edits, LOC delta |
-| test-runner | sonnet | – | pass/fail plus root-cause notes |
-| code-reviewer | inherit | – | findings by pass and severity |
+| test-runner | sonnet | `<item>/runs/*` | pass/fail plus root-cause notes |
+| code-reviewer | opus | – | findings by pass and severity |
 
 ## Stacks: profiles, presets and `/dw:setup-repo`
 dw's core knows no language. Hooks and agents only use a **repo profile**:
@@ -170,18 +170,17 @@ Tests run at two points, not after every code change:
 1. **Red step** (test-first only): test-author runs the new tests once and they must FAIL for the expected reason. They are then locked (path + SHA-256).
 2. **Before the commit**: test-runner runs the plan's Proof once (and once per fix batch, max 2 fix cycles).
 
-Implementer and simplifier only build (or type-check). Locked tests are their spec; a hash check after each subagent (SubagentStop for its own checkout, `verify-locks` for every bound repo) and at the commit gate makes sure they were not changed by any route. After the commit the lock is released, so PR-review test changes go through test-author normally.
+Implementer and simplifier only build (or type-check). Locked tests are their spec; a hash check after each implementer/simplifier run (`verify-locks`, every bound repo) and at the commit gate makes sure they were not changed by any route. After the commit the lock is released, so PR-review test changes go through test-author normally.
 
 Considered and rejected: letting the implementer run the locked tests while coding. Each FAIL would then cost a fresh implementer spawn plus a test-runner run; revisit if fix cycles become frequent.
 
 ## Hooks (`hooks/hooks.json`, node, no npm dependencies)
 | Hook | Rule |
 |---|---|
-| `guard-edit.js` (Edit/Write/NotebookEdit) | **Deny:** edits on protected branches (git-ignored files allowed); outside the active item's worktree (checkouts bound with `bind-repo` count as inside); code edits before `phase: approved` (fails closed); plan.md phase edits that skip gate 1; locked tests (anyone); tests by implementer/simplifier; production code by test-author; files outside the diff by simplifier; anything inside `.git`. **Ask:** edits to `.claude/dw.json`. |
+| `guard-edit.js` (Edit/Write/NotebookEdit) | **Deny:** edits on protected branches (git-ignored files allowed); outside the active item's worktree (checkouts bound with `bind-repo` count as inside); code edits before `phase: approved` (fails closed); plan.md phase edits that skip gate 1; locked tests (anyone); tests by implementer/simplifier; production code by test-author; files outside the diff by simplifier; anything inside `.git`; anything but its `<item>/runs/` report by test-runner. **Ask:** edits to `.claude/dw.json`. |
 | `gate-bash.js` (Bash/PowerShell) | **Ask:** gates 1-4 and discards (table above), test unlock, `dw-state.js clear`. Looks inside `bash -c`, `pwsh -Command`/`-EncodedCommand`, `cmd /c` and `eval`. **Deny:** test commands for implementer/simplifier; `git commit` while a locked test differs from its locked hash; shell writes to `<git-dir>/dw/` state. |
 | `gate-mcp.js` (GitHub MCP tools) | Known read verbs → allow; writes → ask (issue tools gate 4, PR/repo tools gate 3); anything unknown → ask. |
 | `plan-approved.js` (PostToolUse `ExitPlanMode`) | Records the plan-mode approval as gate 1, so the plan is approved once. |
-| `subagent-stop.js` (SubagentStop) | If a locked test changed during the subagent's run, sends it back once to report `LOCKED TEST CHANGED`. |
 | `session-start.js` | Titles the session with the worktree branch and announces an active item (and its bound repos). |
 | `usage-refresh.js` (SessionEnd) | Refreshes the bound item's usage stats and the dashboard when `usage_auto_refresh` is on. No tokens used. |
 | `allow-item-dir.js` (Read/Grep/Glob/Edit/Write) | **Allows** access to the bound item's folder from a worktree, so subagents use the single copy in place without an outside-directory prompt. Only allows; `guard-edit.js` denies still win. |

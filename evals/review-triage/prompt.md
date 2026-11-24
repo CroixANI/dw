@@ -16,4 +16,4 @@ important:
 nits_not_listed: 0
 ```
 
-Do the triage step of /dw:deliver step 8 for this finding (read pipeline.md §8). Do not edit any file and do not start the implementer; just tell me your outcome for R1 and what happens next.
+Do the triage step of /dw:deliver step 8 for this finding (read references/step-8-review.md). Do not edit any file and do not start the implementer; just tell me your outcome for R1 and what happens next.

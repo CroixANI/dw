@@ -37,6 +37,16 @@ if (/(^|\/)\.git(\/|$)/.test(abs)) {
   c.emit(findings);
 }
 
+// 1a. test-runner has Write only for its report in <item>/runs/; it never edits code, tests or anything else.
+if (agent === 'test-runner') {
+  const own = c.activeItem(cwd);
+  const runsDir = own && own.item.item_dir ? path.join(c.real(own.item.item_dir), 'runs') : '';
+  if (!runsDir || !c.isInside(abs, runsDir) || c.same(abs, runsDir)) {
+    deny(`test-runner writes only its report under <item>/runs/ (${runsDir || 'no bound item'}); ${abs} is outside. It never fixes anything.`);
+    c.emit(findings);
+  }
+}
+
 // Files changed on this branch vs the base branch, plus uncommitted/untracked changes.
 function inDiff(worktree, rel) {
   const base = profiles.profileFor(worktree).base_branch;

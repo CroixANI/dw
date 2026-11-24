@@ -692,7 +692,7 @@ test('dw-state: frontmatter edits keep $ patterns literally', () => {
   });
 });
 
-// ---------- test lock holds: hashes, commit gate, SubagentStop, release ----------
+// ---------- test lock holds: hashes, commit gate, release ----------
 test('dw-state: lock-tests records a hash per file and verify-locks detects shell edits', () => {
   setPhase('implement');
   lock();
@@ -727,28 +727,6 @@ test('gate 2: commit is denied while a locked test differs from its locked conte
     fs.writeFileSync(LOCKED, original);
     unlock();
     setPhase('implement');
-  }
-});
-
-test('subagent-stop: implementer that changed a locked test is told to report it (once)', () => {
-  setPhase('implement');
-  lock();
-  const original = fs.readFileSync(LOCKED, 'utf8');
-  const stop = (extra) =>
-    spawnSync('node', [HOOK('subagent-stop.js')], {
-      input: JSON.stringify({ hook_event_name: 'SubagentStop', cwd: wt, agent_type: 'dw:implementer', ...extra }),
-      encoding: 'utf8',
-    });
-  try {
-    assert.strictEqual(stop({}).stdout.trim(), '');
-    fs.writeFileSync(LOCKED, 'class T { }\n');
-    const o = JSON.parse(stop({}).stdout);
-    assert.strictEqual(o.decision, 'block');
-    assert.match(o.reason, /EngineTests\.cs/);
-    assert.strictEqual(stop({ stop_hook_active: true }).stdout.trim(), '');
-  } finally {
-    fs.writeFileSync(LOCKED, original);
-    unlock();
   }
 });
 
@@ -802,10 +780,22 @@ test('hooks.json: MCP gate matcher targets GitHub servers only', () => {
   for (const t of ['mcp__claude_ai_Figma__create_new_file', 'mcp__memory__memory_write', 'mcp__gitlab__create_issue']) assert.ok(!re.test(t), t);
 });
 
-test('hooks.json: ExitPlanMode and SubagentStop hooks are registered', () => {
+test('hooks.json: ExitPlanMode hook is registered; no SubagentStop (verify-locks + gate 2 hold the lock)', () => {
   const hooks = JSON.parse(fs.readFileSync(path.join(ROOT, 'hooks', 'hooks.json'), 'utf8')).hooks;
   assert.ok((hooks.PostToolUse || []).some((h) => h.matcher === 'ExitPlanMode'));
-  assert.ok((hooks.SubagentStop || []).length > 0);
+  assert.strictEqual(hooks.SubagentStop, undefined);
+  assert.ok(!fs.existsSync(HOOK('subagent-stop.js')));
+});
+
+test('edit: test-runner may write its report under <item>/runs/ only', () => {
+  setPhase('verify');
+  const report = path.join(itemDir, 'runs', 'verify-1.md');
+  assert.strictEqual(run('guard-edit.js', edit(wt, report, 'dw:test-runner')).decision, 'none');
+  assert.strictEqual(run('guard-edit.js', edit(wt, report, 'test-runner')).decision, 'none');
+  assert.strictEqual(run('guard-edit.js', edit(wt, ENGINE, 'dw:test-runner')).decision, 'deny');
+  assert.strictEqual(run('guard-edit.js', edit(wt, path.join(itemDir, 'plan.md'), 'dw:test-runner')).decision, 'deny');
+  assert.strictEqual(run('guard-edit.js', edit(wt, path.join(itemDir, 'runs'), 'dw:test-runner')).decision, 'deny');
+  assert.strictEqual(run('guard-edit.js', edit(main, report, 'dw:test-runner')).decision, 'deny');
 });
 
 // ---------- plugin layout ----------
@@ -1228,7 +1218,7 @@ test('multi-repo docs: agents, pipeline and pr skill know about several repos; e
   assert.match(rd('agents', 'test-runner.md'), /^repos:$/m);
   assert.match(rd('agents', 'test-runner.md'), /test_cmd/);
   assert.match(rd('agents', 'test-author.md'), /test_filter_hint/);
-  assert.match(rd('skills', 'deliver', 'references', 'pipeline.md'), /## 3a\. Bind the other repos/);
+  assert.match(rd('skills', 'deliver', 'references', 'step-3a-multi-repo.md'), /## 3a\. Bind the other repos/);
   assert.match(rd('skills', 'pr', 'SKILL.md'), /dw-state\.js" repos/);
   assert.match(rd('templates', 'item', 'plan.md'), /^repos: /m);
   const ex = JSON.parse(rd('templates', 'repo', 'dw-repos.example.json'));
@@ -1348,8 +1338,8 @@ test('docs: bound-repo shell rule has one home and the skills point to it; pipel
   for (const f of [['skills', 'commit', 'SKILL.md'], ['skills', 'pr', 'SKILL.md'], ['skills', 'pr-sweep', 'SKILL.md'], ['skills', 'resume', 'SKILL.md']]) {
     assert.match(rd(...f), /Running commands in a bound repo/, f.join('/'));
   }
-  assert.match(rd('skills', 'deliver', 'references', 'pipeline.md'), /that repo's `path`, `base`/);
-  assert.match(rd('skills', 'deliver', 'references', 'pipeline.md'), /not in `repos:` needs a plan\.md edit and a new gate-1 approval/);
+  assert.match(rd('skills', 'deliver', 'references', 'step-3a-multi-repo.md'), /that repo's `path`, `base`/);
+  assert.match(rd('skills', 'deliver', 'references', 'step-1-3-design-plan.md'), /not in `repos:` needs a plan\.md edit and a new gate-1 approval/);
 });
 
 // ---------- real paths: a short 8.3 name, junction or symlink must not change a decision ----------
