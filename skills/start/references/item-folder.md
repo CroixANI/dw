@@ -3,6 +3,7 @@
 `<research_root>/<id>-<slug>/` (lowercase slug of ≤ ~40 chars, whole words, e.g. `42-dark-mode-toggle`, `local-3-retry-on-timeout`; no item type in the name, so folders sort and search by id) — default `<parent of main checkout>/<family>-research/` (family = checkout folder name up to the first `.`, so `app` and `app.web` share `<parent>/app-research/`). It must stay outside the main checkout: Claude Code refuses Edit/Write on main-checkout paths from a worktree session.
 Local working copies only: for a GitHub item the issue is the source of truth; every file names the item ref (`#42` or `local-3`).
 It lives outside the worktree, so it survives worktree removal and is shared by all sessions for the item.
+Cleanup (`worktree` skill, Close) moves it to `<research_root>/archive/<id>-<slug>/` with `dw-state.js archive`. To resume, the user moves it back to `<research_root>/`; until then `item-path` refuses the id (it never creates a second folder). Archived items stay on the usage dashboard.
 One artifact per stage, all lowercase file names, following the AI-Native SDLC chain (intent → spec → plan): the issue snapshot and the design decisions share `spec.md`.
 
 | File | Stage | Written by | Read by |

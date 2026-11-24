@@ -10,7 +10,7 @@
 // gate-bash.js asks the user for: set-phase approved (unless plan-approval.json exists), any jump from a
 // pre-approval phase, unlock-tests and clear.
 //
-// Usage. Where to run: item-path, next-local-id and profile anywhere in the repo; init and bind-repo in the item's checkout;
+// Usage. Where to run: item-path, next-local-id, profile and archive anywhere in the repo (archive not from inside the item folder or a removed worktree); init and bind-repo in the item's checkout;
 // find in any checkout of the repo; status, repos, verify-locks, release-locks from any checkout bound to the item;
 // lock-tests in the checkout whose tests are locked (or --repo).
 //   node dw-state.js init --id 42 --type bug --item-dir "<research_root>/42-slug" [--tracker github|local] [--issue-url <url>]
@@ -28,10 +28,25 @@
 //   node dw-state.js bind-repo <path>         (bind another repo's checkout to this item; idempotent)
 //   node dw-state.js repos                    (primary + bound repos: branch, base branch, gh repo, profile)
 //   node dw-state.js clear                    (forget the item for this worktree and unbind every bound repo)
+//   node dw-state.js archive --id 42 [--root <dir>]   (cleanup: move <root>/<id>-<slug> to <root>/archive/; refuses while bound)
 const fs = require('fs');
 const path = require('path');
 const c = require('../hooks/lib/common');
 const profiles = require('../hooks/lib/profiles');
+
+const ARCHIVE = 'archive'; // <research root>/archive/<id>-<slug>: closed items; move a folder back to the root to resume it
+
+// Name of the item folder for this id directly inside dir, or undefined
+function itemFolderIn(dir, id) {
+  try {
+    const hit = fs.readdirSync(dir, { withFileTypes: true }).find(
+      (d) => d.isDirectory() && (d.name.toLowerCase() === id || d.name.toLowerCase().startsWith(id + '-'))
+    );
+    return hit ? hit.name : undefined;
+  } catch (_) {
+    return undefined; // dir does not exist yet
+  }
+}
 
 const PHASES = ['intake', 'investigate', 'design', 'plan', 'approved', 'tests', 'implement', 'simplify', 'verify', 'review', 'commit', 'pr', 'sweep', 'done'];
 
@@ -211,11 +226,11 @@ switch (cmd) {
       slug = slug ? slug + '-' + w : w;
     }
     // reuse an existing folder for this id even if the title changed
-    let existing = null;
-    try {
-      existing = fs.readdirSync(root).find((d) => d === id || d.toLowerCase().startsWith(id + '-'));
-    } catch (_) {
-      /* root does not exist yet */
+    const existing = itemFolderIn(root, id);
+    // an archived item is never re-created silently: the user moves it back to the root to resume it
+    if (!existing) {
+      const old = itemFolderIn(path.join(root, ARCHIVE), id);
+      if (old) fail(`${c.itemRef({ item_id: id })} is archived at ${c.norm(path.join(root, ARCHIVE, old))}; move it back to ${c.norm(root)} to resume it`);
     }
     const dir = path.join(root, existing || [id, slug].filter(Boolean).join('-'));
     fs.mkdirSync(dir, { recursive: true });
@@ -226,13 +241,15 @@ switch (cmd) {
     const root = profiles.researchRoot(process.cwd(), a.root);
     if (!root) fail('not in a git repo and no --root given');
     let max = 0;
-    try {
-      for (const d of fs.readdirSync(root)) {
-        const m = /^local-(\d+)(-|$)/i.exec(d);
-        if (m) max = Math.max(max, parseInt(m[1], 10));
+    for (const base of [root, path.join(root, ARCHIVE)]) {
+      try {
+        for (const d of fs.readdirSync(base)) {
+          const m = /^local-(\d+)(-|$)/i.exec(d);
+          if (m) max = Math.max(max, parseInt(m[1], 10));
+        }
+      } catch (_) {
+        /* no research root or archive yet */
       }
-    } catch (_) {
-      /* no research root yet: local-1 */
     }
     print({ id: 'local-' + (max + 1), root });
     break;
@@ -462,6 +479,38 @@ switch (cmd) {
     print({ cleared: true, unbound });
     break;
   }
+  case 'archive': {
+    // Last cleanup step, after 'clear' and the worktree removal: move the item folder to <root>/archive/<name>.
+    const id = idArg(true);
+    const bound = c.worktrees(process.cwd()).filter((t) => {
+      const item = c.itemAt(t);
+      return item && String(item.item_id) === id;
+    });
+    if (bound.length) fail(`${c.itemRef({ item_id: id })} is still bound to ${bound.map(c.norm).join(', ')}; run 'clear' there (and remove the worktree) first`);
+    const root = profiles.researchRoot(process.cwd(), a.root);
+    if (!root) fail('not in a git repo and no --root given');
+    const name = itemFolderIn(root, id);
+    if (name) {
+      const from = path.join(root, name);
+      const to = path.join(root, ARCHIVE, name);
+      if (fs.existsSync(to)) fail(`${c.norm(to)} already exists; refusing to overwrite it (merge or rename one of them by hand)`);
+      fs.mkdirSync(path.join(root, ARCHIVE), { recursive: true });
+      try {
+        fs.renameSync(from, to);
+      } catch (e) {
+        fail(`cannot move ${c.norm(from)} (${e.code || e.message}); close any shell, editor or session whose working directory is inside it, then retry`);
+      }
+      print({ archived: c.norm(to), from: c.norm(from) });
+      break;
+    }
+    const old = itemFolderIn(path.join(root, ARCHIVE), id);
+    if (old) {
+      print({ archived: c.norm(path.join(root, ARCHIVE, old)), already: true });
+      break;
+    }
+    fail(`no item folder for ${c.itemRef({ item_id: id })} in ${c.norm(root)}`);
+    break;
+  }
   default:
-    fail('unknown command. Use: item-path | next-local-id | profile | init | status | lock-tests | unlock-tests | verify-locks | release-locks | find | set-phase | bump-fix-cycles | bind-repo | repos | clear');
+    fail('unknown command. Use: item-path | next-local-id | profile | init | status | lock-tests | unlock-tests | verify-locks | release-locks | find | set-phase | bump-fix-cycles | bind-repo | repos | clear | archive');
 }

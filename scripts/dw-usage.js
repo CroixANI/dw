@@ -421,19 +421,26 @@ function researchRoot(a) {
   if (!root) fail('not in a git repo and no --root given');
   return root;
 }
+// Closed items live in <root>/archive/<id>-<slug> (dw-state.js archive); they keep counting on the dashboard.
+const ARCHIVE = 'archive';
+// Item folders of the root and of <root>/archive
 function itemDirs(root) {
   const out = [];
-  try {
-    for (const d of fs.readdirSync(root, { withFileTypes: true })) {
-      if (d.isDirectory()) out.push({ name: d.name, dir: path.join(root, d.name) });
+  for (const base of [root, path.join(root, ARCHIVE)]) {
+    try {
+      for (const d of fs.readdirSync(base, { withFileTypes: true })) {
+        if (d.isDirectory() && !(base === root && d.name.toLowerCase() === ARCHIVE)) out.push({ name: d.name, dir: path.join(base, d.name) });
+      }
+    } catch (_) {
+      /* no such folder */
     }
-  } catch (_) {
-    /* no such folder */
   }
   return out;
 }
+// The research root of an item folder (an archived folder's root is two levels up)
 function itemRootOf(dir) {
-  return path.dirname(path.resolve(dir));
+  const parent = path.dirname(path.resolve(dir));
+  return path.basename(parent).toLowerCase() === ARCHIVE ? path.dirname(parent) : parent;
 }
 function findItemDir(root, id) {
   const hit = itemDirs(root).find((x) => x.name.toLowerCase() === id || x.name.toLowerCase().startsWith(id + '-'));
