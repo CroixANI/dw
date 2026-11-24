@@ -1640,3 +1640,97 @@ test('dw-usage v2: sticky skill attribution keeps last main-session skill across
   assert.strictEqual(j.by_stage.conversation.calls, 1);
   assert.strictEqual(j.by_stage.understand.calls, 2);
 });
+
+test('dw-state: archive moves the item folder to <root>/archive, is idempotent, refuses overwrite, item-path refuses to re-create it, and next-local-id skips archived local ids', () => {
+  const rRoot = fs.mkdtempSync(path.join(tmp, 'archive-root-'));
+  const created = JSON.parse(
+    execFileSync('node', [STATE, 'item-path', '--id', '555', '--title', 'Cleanup me', '--root', rRoot], { cwd: main, encoding: 'utf8' })
+  );
+  assert.ok(fs.existsSync(created.item_dir));
+
+  // First archive moves the folder to <root>/archive/<name>
+  const first = JSON.parse(execFileSync('node', [STATE, 'archive', '--id', '555', '--root', rRoot], { cwd: main, encoding: 'utf8' }));
+  assert.ok(first.archived.endsWith('/archive/555-cleanup-me'), first.archived);
+  assert.strictEqual(first.from, created.item_dir);
+  assert.ok(!fs.existsSync(created.item_dir));
+  assert.ok(fs.existsSync(first.archived));
+
+  // Second archive is idempotent
+  const second = JSON.parse(execFileSync('node', [STATE, 'archive', '--id', '555', '--root', rRoot], { cwd: main, encoding: 'utf8' }));
+  assert.strictEqual(second.archived, first.archived);
+  assert.strictEqual(second.already, true);
+
+  // item-path refuses to silently re-create an archived item
+  const recreate = spawnSync('node', [STATE, 'item-path', '--id', '555', '--title', 'Again', '--root', rRoot], { cwd: main, encoding: 'utf8' });
+  assert.notStrictEqual(recreate.status, 0);
+  assert.match(recreate.stderr, /is archived at/);
+  assert.match(recreate.stderr, /555-cleanup-me/);
+
+  // Refuses to overwrite an existing archived folder if a duplicate appears in root
+  fs.mkdirSync(created.item_dir, { recursive: true });
+  const overwrite = spawnSync('node', [STATE, 'archive', '--id', '555', '--root', rRoot], { cwd: main, encoding: 'utf8' });
+  assert.notStrictEqual(overwrite.status, 0);
+  assert.match(overwrite.stderr, /already exists; refusing to overwrite/);
+  assert.ok(fs.existsSync(created.item_dir));
+
+  // next-local-id scans archive/ too so archived local ids are never re-issued
+  const loc = JSON.parse(execFileSync('node', [STATE, 'item-path', '--id', 'local-1', '--title', 'Local item', '--root', rRoot], { cwd: main, encoding: 'utf8' }));
+  execFileSync('node', [STATE, 'archive', '--id', 'local-1', '--root', rRoot], { cwd: main, encoding: 'utf8' });
+  assert.ok(!fs.existsSync(loc.item_dir));
+  const next = JSON.parse(execFileSync('node', [STATE, 'next-local-id', '--root', rRoot], { cwd: main, encoding: 'utf8' }));
+  assert.strictEqual(next.id, 'local-2');
+});
+
+test('dw-state: archive refuses while a checkout is still bound to the item', () => {
+  const r = spawnSync('node', [STATE, 'archive', '--id', '123', '--root', research], { cwd: main, encoding: 'utf8' });
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stderr, /still bound to/);
+  assert.match(r.stderr, /clear/);
+  assert.ok(fs.existsSync(itemDir));
+});
+
+test('dw-usage: archived items stay on the dashboard and refresh writes usage-dashboard.html to the real root', () => {
+  const u = fs.mkdtempSync(path.join(tmp, 'usage-archive-'));
+  const projects = path.join(u, 'projects');
+  const root = path.join(u, 'app-research');
+  const projDir = path.join(projects, 'app');
+  fs.mkdirSync(projDir, { recursive: true });
+
+  const archivedItem = path.join(root, 'archive', '88-archived-fix');
+  fs.mkdirSync(archivedItem, { recursive: true });
+  fs.writeFileSync(
+    path.join(projDir, 's88.jsonl'),
+    JSON.stringify({
+      type: 'assistant',
+      timestamp: '2026-11-04T12:00:00Z',
+      cwd: '/repos/app-worktrees/88-archived-fix',
+      requestId: 'r88',
+      message: {
+        id: 'm88',
+        model: 'claude-sonnet-5-5',
+        usage: { input_tokens: 100, output_tokens: 1000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    }) + '\n'
+  );
+
+  const USAGE = path.join(ROOT, 'scripts', 'dw-usage.js');
+  // refresh finds the archived item by --id and writes usage-dashboard.html / usage-help.html to the real root
+  const out = JSON.parse(
+    execFileSync('node', [USAGE, 'refresh', '--id', '88', '--root', root, '--projects-dir', projects], { encoding: 'utf8' })
+  );
+  assert.ok(out.item_dir.endsWith('/archive/88-archived-fix'), out.item_dir);
+  assert.strictEqual(out.dashboard.items, 1);
+  assert.ok(fs.existsSync(path.join(root, 'usage-dashboard.html')));
+  assert.ok(fs.existsSync(path.join(root, 'usage-help.html')));
+  assert.ok(!fs.existsSync(path.join(root, 'archive', 'usage-dashboard.html')));
+
+  // refresh with --item-dir (no --root) also resolves the real root two levels up
+  fs.unlinkSync(path.join(root, 'usage-dashboard.html'));
+  const outByDir = JSON.parse(
+    execFileSync('node', [USAGE, 'refresh', '--id', '88', '--item-dir', archivedItem, '--projects-dir', projects], { encoding: 'utf8' })
+  );
+  assert.strictEqual(outByDir.dashboard.items, 1);
+  assert.ok(fs.existsSync(path.join(root, 'usage-dashboard.html')));
+  assert.ok(!fs.existsSync(path.join(root, 'archive', 'usage-dashboard.html')));
+  assert.match(fs.readFileSync(path.join(root, 'usage-dashboard.html'), 'utf8'), /#88/);
+});

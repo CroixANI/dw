@@ -213,6 +213,9 @@ Run state lives in two places:
 - `plan.md` frontmatter: `item_id`, `tracker`, `type`, `phase`, `test_mode`, `fix_cycles`, `pr`, `repos`, `prs`.
 - `<git-dir>/dw/`: the item binding, the test lock (hashes ignore CRLF/LF and a BOM) and the recorded plan approval (a hash of the approved plan, compared with plan.md at `set-phase approved`).
 
+## Cleanup and the archive
+Cleaning up an item (after merge, or whenever you ask to remove its worktree/branch) runs `dw-state.js clear`, the worktree removal, and then `dw-state.js archive --id <id>`, which moves the item folder to `<research_root>/archive/<id>-<slug>`. To pick the item up again, move the folder back to `<research_root>/` yourself; until you do, `item-path` (and so `/dw:start`) refuses that id instead of creating a second folder. Archived items stay on the usage dashboard.
+
 ## Develop
 ```text
 npm test                        # hook + dw-state unit tests (node --test)

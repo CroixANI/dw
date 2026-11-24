@@ -69,7 +69,11 @@ Read/Grep/Glob/Edit/Write on exactly the bound item folder, so subagents get no 
 `S find --id <id>` from any checkout of the repo lists bound worktrees with their phase and bound repos; `S repos` (from any bound checkout) lists the whole item.
 
 ## Close
-When every PR is merged (or the user is done), per repo:
-1. `S clear` first (it asks the user; it unbinds the item and every bound repo). Never `ExitWorktree` with `remove` before the merge (it deletes the branch).
-2. Worktree: `ExitWorktree` (keep), then from the main checkout `git worktree remove "<path>"` (asks only with `--force`; refuse to force when it has uncommitted or unpushed work unless the user says so), then `git branch -d <branch>` once merged.
-3. Branch only: `git switch <base>`, then `git pull --ff-only`, then `git branch -d <branch>` once merged.
+When every PR is merged (or the user is done):
+1. `S clear` first (it asks the user; it unbinds the item and every bound repo), in every checkout of the item. Never `ExitWorktree` with `remove` before the merge (it deletes the branch).
+2. Per repo:
+   - Worktree: `ExitWorktree` (keep), then from the main checkout `git worktree remove "<path>"` (asks only with `--force`; refuse to force when it has uncommitted or unpushed work unless the user says so), then `git branch -d <branch>` once merged.
+   - Branch only: `git switch <base>`, then `git pull --ff-only`, then `git branch -d <branch>` once merged, then `dw-state.js archive` (see step 3).
+3. **Archive the item folder**, always part of cleanup, from the main checkout (not from inside the item folder or the removed worktree): `node "${CLAUDE_PLUGIN_ROOT}/scripts/dw-state.js" archive --id <id> --root "${user_config.research_root}"` (omit `--root` when `research_root` is empty). It moves `<research_root>/<id>-<slug>` to `<research_root>/archive/<id>-<slug>` and prints the new path; it refuses while any checkout is still bound, never overwrites an existing archived folder, and is a no-op (`already: true`) when already archived. On a "cannot move" error, tell the user which folder is held open so they can close it and retry.
+
+Resuming an archived item: the user moves the folder back to `<research_root>/` by hand. `item-path` refuses to create a new folder for an archived id and says where it is.

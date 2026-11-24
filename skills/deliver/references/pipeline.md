@@ -88,7 +88,7 @@
 - No issue comment: `Closes #<n>` in the PR body is the only linkage (none for a local item).
 
 ## 11. After the PR
-- `S set-phase sweep`. When reviews/checks arrive: `/dw:pr-sweep`. When every PR is merged: update history.md (close the iteration), `S set-phase done`, `S clear` (asks the user: it unbinds the item and every bound repo, and drops every per-item guard), then the `worktree` skill's Close steps in each repo.
+- `S set-phase sweep`. When reviews/checks arrive: `/dw:pr-sweep`. When every PR is merged: update history.md (close the iteration), `S set-phase done`, `S clear` (asks the user: it unbinds the item and every bound repo, and drops every per-item guard), the `worktree` skill's Close steps in each repo, then `S archive --id <id>` (item folder → `archive/`).
 
 ## Resuming
 Everything needed to continue is in plan.md (phase, test mode, fix cycles, PRs, repos) + the worktrees (`S repos`) + `<git-dir>/dw/` of each. See `/dw:resume`.

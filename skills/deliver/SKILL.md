@@ -27,7 +27,7 @@ You are the orchestrator. Hold only: the item, `spec.md`/`plan.md`, decisions, a
 | 8 | `review` | code-reviewer (fresh) | diff + plan/spec + REVIEW.md → findings |
 | 9 | `commit` | `/dw:commit` — **gate 2**, then `S release-locks` | → commit |
 | 10 | `pr` | `/dw:pr` — **gate 3** | → PR |
-| 11 | `sweep` → `done` | `/dw:pr-sweep`, then `S clear` (asks) and the `worktree` skill's Close steps | |
+| 11 | `sweep` → `done` | `/dw:pr-sweep`, then `S clear` (asks), the `worktree` skill's Close steps, then `S archive --id <id>` (item folder → `archive/`) | |
 
 ## Rules that matter most
 - **Test mode** (record in plan.md with a one-line reason): bug → `test-first` (failing repro test). Task/feature → `test-first` when acceptance criteria are concretely testable, else `code-first`. If unclear, ask the user one question.
